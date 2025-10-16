@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-interface Params {
-    slug: string;
-}
+export async function GET(request: Request) {
+    const url = new URL(request.url);
+    // Extract the slug from the pathname
+    // /api/article/some-slug
+    const slug = url.pathname.split('/').pop();
 
-export async function GET(
-    _request: Request,
-    context: { params: Params }
-) {
-    const { slug } = context.params;
+    if (!slug) {
+        return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
+    }
 
     try {
         const article = await prisma.articles.findUnique({
@@ -35,13 +35,8 @@ export async function GET(
 
         return NextResponse.json({ article });
     } catch (err: unknown) {
-        console.error('Prisma query failed:', err);
-
+        console.error('Database query failed:', err);
         const message = err instanceof Error ? err.message : 'Database error';
-
-        return NextResponse.json(
-            { error: 'Database error', details: message },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Database error', details: message }, { status: 500 });
     }
 }
