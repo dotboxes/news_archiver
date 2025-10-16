@@ -3,6 +3,49 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { articles as ArticleType } from '@prisma/client';
+import Link from 'next/link';
+
+interface ProcessedContent {
+    content: string;
+    sources: Array<{ url: string; title: string }>;
+}
+
+function processArticleContent(rawContent: string): ProcessedContent {
+    // Extract all URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const sources: Array<{ url: string; title: string }> = [];
+    const urlMatches = rawContent.match(urlRegex) || [];
+
+    urlMatches.forEach((url) => {
+        const cleanUrl = url.replace(/[.,;:!?'")\]]+$/, '');
+        if (!sources.some(s => s.url === cleanUrl)) {
+            try {
+                const urlObj = new URL(cleanUrl);
+                const title = urlObj.hostname.replace('www.', '');
+                sources.push({ url: cleanUrl, title });
+            } catch {
+                sources.push({ url: cleanUrl, title: cleanUrl });
+            }
+        }
+    });
+
+    // Remove URLs from content
+    let cleanContent = rawContent.replace(urlRegex, '').trim();
+
+    // Remove markdown formatting
+    cleanContent = cleanContent.replace(/\*\*\*(.+?)\*\*\*/g, '$1'); // ***text*** -> text
+    cleanContent = cleanContent.replace(/\*\*(.+?)\*\*/g, '$1');     // **text** -> text
+    cleanContent = cleanContent.replace(/\*(.+?)\*/g, '$1');         // *text* -> text
+    cleanContent = cleanContent.replace(/~~(.+?)~~/g, '$1');         // ~~text~~ -> text
+
+    // Clean up extra whitespace
+    cleanContent = cleanContent.replace(/\n\s*\n/g, '\n\n');
+
+    return {
+        content: cleanContent,
+        sources
+    };
+}
 
 export default function ArticlePage() {
     const params = useParams();
@@ -12,6 +55,7 @@ export default function ArticlePage() {
     const [article, setArticle] = useState<ArticleType | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [processedContent, setProcessedContent] = useState<ProcessedContent | null>(null);
 
     useEffect(() => {
         const fetchArticle = async () => {
@@ -25,6 +69,7 @@ export default function ArticlePage() {
 
                 const data = await response.json();
                 setArticle(data.article);
+                setProcessedContent(processArticleContent(data.article.content));
                 setError(null);
             } catch (err) {
                 setError('Failed to load article');
@@ -137,11 +182,36 @@ export default function ArticlePage() {
                         </div>
 
                         {/* Article Content */}
-                        <div className="prose prose-lg max-w-none">
-                            <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                {article.content}
+                        <div className="prose prose-lg max-w-none mb-12">
+                            <div className="text-gray-700 leading-relaxed">
+                                {processedContent?.content.split('\n\n').map((paragraph, idx) => (
+                                    <p key={idx} className="mb-4">
+                                        {paragraph}
+                                    </p>
+                                ))}
                             </div>
                         </div>
+
+                        {/* Sources Section */}
+                        {processedContent && processedContent.sources.length > 0 && (
+                            <section className="border-t-2 border-gray-300 pt-8">
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Sources</h2>
+                                <ul className="space-y-3">
+                                    {processedContent.sources.map((source, idx) => (
+                                        <li key={idx}>
+                                            <Link
+                                                href={source.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                                            >
+                                                {source.title}
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+                        )}
                     </div>
                 </article>
             </div>
