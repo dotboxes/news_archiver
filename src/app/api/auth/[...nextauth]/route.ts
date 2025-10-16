@@ -6,7 +6,7 @@ import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const { handlers, auth } = NextAuth({
     adapter: PrismaAdapter(prisma),
     providers: [
         Discord({
@@ -19,9 +19,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session: {
         strategy: "database",
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+        maxAge: 30 * 24 * 60 * 60,
     },
 })
 
 export const GET = handlers.GET
 export const POST = handlers.POST
+export { auth }
