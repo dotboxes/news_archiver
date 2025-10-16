@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from '@/app/auth/actions';
+import { signIn } from 'next-auth/react';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -40,12 +40,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         <h2 className="text-2xl font-bold text-gray-900">Sign In</h2>
                         <button
                             onClick={onClose}
-                            className="text-gray-500 hover:text-gray-800 text-2xl leading-none
-               transition-all duration-200 transform hover:scale-110"
+                            className="text-gray-500 hover:text-gray-700 text-2xl leading-none transition-colors"
                         >
                             ×
                         </button>
-
                     </div>
 
                     {/* Content */}
