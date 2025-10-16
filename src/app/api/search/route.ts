@@ -2,11 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q')?.trim() || '';
+    const url = new URL(request.url);
+    const query = url.searchParams.get('q')?.trim() || '';
 
     try {
-        // Fetch articles with optional search
         const articles = await prisma.articles.findMany({
             where: query
                 ? {
@@ -23,12 +22,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ articles });
     } catch (err: unknown) {
         console.error('Database query failed:', err);
-
         const message = err instanceof Error ? err.message : 'Database error';
-
-        return NextResponse.json(
-            { error: 'Database error', details: message },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Database error', details: message }, { status: 500 });
     }
 }

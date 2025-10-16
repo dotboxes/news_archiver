@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function GET(
-    request: Request,
-    { params }: { params?: Record<string, string> }
-) {
-    const slug = params?.slug;
+interface Params {
+    slug: string;
+}
 
-    if (!slug) {
-        return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
-    }
+export async function GET(
+    _request: Request,
+    context: { params: Params }
+) {
+    const { slug } = context.params;
 
     try {
         const article = await prisma.articles.findUnique({
