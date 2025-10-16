@@ -3,9 +3,13 @@ import prisma from '@/lib/prisma';
 
 export async function GET(
     request: Request,
-    { params }: { params: { slug: string } }
+    { params }: { params?: Record<string, string> }
 ) {
-    const { slug } = params;
+    const slug = params?.slug;
+
+    if (!slug) {
+        return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
+    }
 
     try {
         const article = await prisma.articles.findUnique({
@@ -33,15 +37,11 @@ export async function GET(
     } catch (err: unknown) {
         console.error('Prisma query failed:', err);
 
-        let message = 'Database error';
-        if (err instanceof Error) {
-            message = err.message;
-        }
+        const message = err instanceof Error ? err.message : 'Database error';
 
         return NextResponse.json(
             { error: 'Database error', details: message },
             { status: 500 }
         );
     }
-
 }

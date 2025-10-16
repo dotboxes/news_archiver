@@ -24,10 +24,7 @@ export async function GET(request: Request) {
     } catch (err: unknown) {
         console.error('Database query failed:', err);
 
-        let message = 'Database error';
-        if (err instanceof Error) {
-            message = err.message;
-        }
+        const message = err instanceof Error ? err.message : 'Database error';
 
         return NextResponse.json(
             { error: 'Database error', details: message },
