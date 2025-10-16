@@ -21,8 +21,17 @@ export async function GET(request: Request) {
         });
 
         return NextResponse.json({ articles });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('Database query failed:', err);
-        return NextResponse.json({ error: 'Database error', details: err.message }, { status: 500 });
+
+        let message = 'Database error';
+        if (err instanceof Error) {
+            message = err.message;
+        }
+
+        return NextResponse.json(
+            { error: 'Database error', details: message },
+            { status: 500 }
+        );
     }
 }

@@ -30,8 +30,18 @@ export async function GET(
         }
 
         return NextResponse.json({ article });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('Prisma query failed:', err);
-        return NextResponse.json({ error: 'Database error', details: err.message }, { status: 500 });
+
+        let message = 'Database error';
+        if (err instanceof Error) {
+            message = err.message;
+        }
+
+        return NextResponse.json(
+            { error: 'Database error', details: message },
+            { status: 500 }
+        );
     }
+
 }

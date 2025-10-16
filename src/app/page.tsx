@@ -27,9 +27,14 @@ export default function Home() {
             const data = await response.json();
             setArticles(data.articles);
             setError(null);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load articles');
-        } finally {
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('Failed to load articles');
+            }
+        }
+        finally {
             setLoading(false);
         }
     };
