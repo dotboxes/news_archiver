@@ -1,0 +1,34 @@
+cc// app/api/search/route.ts
+import { NextResponse } from 'next/server';
+import sql from '@/lib/database';
+
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get('q') || '';
+
+    try {
+        let articles;
+
+        if (query.trim()) {
+            articles = await sql`
+        SELECT id, title, subtitle, slug, image_url, author, category, published_date
+        FROM articles
+        WHERE title ILIKE ${'%' + query + '%'}
+           OR subtitle ILIKE ${'%' + query + '%'}
+           OR content ILIKE ${'%' + query + '%'}
+        ORDER BY published_date DESC;
+      `;
+        } else {
+            articles = await sql`
+        SELECT id, title, subtitle, slug, image_url, author, category, published_date
+        FROM articles
+        ORDER BY published_date DESC;
+      `;
+        }
+
+        return NextResponse.json({ articles });
+    } catch (err) {
+        console.error('Database query failed:', err);
+        return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+}
