@@ -1,9 +1,12 @@
 import { ArticlePreview } from '@/lib/database';
 import ArticleCard from './ArticleCard';
-import { useMemo, useState, useEffect } from 'react';
+import {useMemo, useState, useEffect, useCallback} from 'react';
 
-interface ArticleGroupProps {
+export interface ArticleGroupProps {
     articles: ArticlePreview[];
+    selectedYear?: string | null;
+    selectedMonth?: string | null;
+    onSelect?: (year: string | null, month: string | null) => void;
 }
 
 // Helper: group articles by year -> month
@@ -26,59 +29,72 @@ function groupByYearMonth(articles: ArticlePreview[]) {
     return grouped;
 }
 
-export default function ArticleGroup({ articles }: ArticleGroupProps) {
+export default function ArticleGroup({
+                                         articles,
+                                         selectedYear: propYear,
+                                         selectedMonth: propMonth,
+                                         onSelect
+                                     }: ArticleGroupProps) {
     const grouped = useMemo(() => groupByYearMonth(articles), [articles]);
 
-    // Get sorted years and months
     const sortedYears = useMemo(() =>
             Object.keys(grouped).sort((a, b) => parseInt(b) - parseInt(a)),
         [grouped]
     );
 
-    const getMonthsForYear = (year: string) => {
-        const monthOrder = ['January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'];
-        return Object.keys(grouped[year])
+    const getMonthsForYear = useCallback((year: string) => {
+        const monthOrder = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        return Object.keys(grouped[year] || {})
             .sort((a, b) => monthOrder.indexOf(b) - monthOrder.indexOf(a));
-    };
+    }, [grouped]);
 
-    // Default to latest year and latest month
+
     const latestYear = sortedYears[0];
     const latestMonth = latestYear ? getMonthsForYear(latestYear)[0] : null;
 
-    const [selectedYear, setSelectedYear] = useState<string>(latestYear || '');
-    const [selectedMonth, setSelectedMonth] = useState<string>(latestMonth || '');
+    const [selectedYear, setSelectedYear] = useState<string>(propYear || latestYear || '');
+    const [selectedMonth, setSelectedMonth] = useState<string>(propMonth || latestMonth || '');
 
-    // Update when articles change (new month/year added)
     useEffect(() => {
         if (sortedYears.length > 0 && !selectedYear) {
             setSelectedYear(sortedYears[0]);
             const months = getMonthsForYear(sortedYears[0]);
             setSelectedMonth(months[0] || '');
         }
-    }, [sortedYears, selectedYear]);
+    }, [sortedYears, selectedYear, getMonthsForYear]);
 
     const monthsForSelectedYear = selectedYear ? getMonthsForYear(selectedYear) : [];
     const articlesForDisplay = selectedYear && selectedMonth
-        ? grouped[selectedYear][selectedMonth]
+        ? grouped[selectedYear]?.[selectedMonth] || []
         : [];
 
     if (sortedYears.length === 0) {
         return <div className="text-center py-12 text-gray-500">No articles available</div>;
     }
 
+    const handleSelectYear = (year: string) => {
+        setSelectedYear(year);
+        const months = getMonthsForYear(year);
+        const month = months[0] || '';
+        setSelectedMonth(month);
+        onSelect?.(year, month);
+    };
+
+    const handleSelectMonth = (month: string) => {
+        setSelectedMonth(month);
+        onSelect?.(selectedYear, month);
+    };
+
     return (
         <div className="space-y-8">
-            {/* Years Selector - Horizontal */}
             <div className="flex gap-2 overflow-x-auto pb-2">
                 {sortedYears.map((year) => (
                     <button
                         key={year}
-                        onClick={() => {
-                            setSelectedYear(year);
-                            const months = getMonthsForYear(year);
-                            setSelectedMonth(months[0] || '');
-                        }}
+                        onClick={() => handleSelectYear(year)}
                         className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
                             selectedYear === year
                                 ? 'bg-blue-600 text-white shadow-md'
@@ -90,13 +106,12 @@ export default function ArticleGroup({ articles }: ArticleGroupProps) {
                 ))}
             </div>
 
-            {/* Months Selector - Horizontal */}
             {monthsForSelectedYear.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-2">
                     {monthsForSelectedYear.map((month) => (
                         <button
                             key={month}
-                            onClick={() => setSelectedMonth(month)}
+                            onClick={() => handleSelectMonth(month)}
                             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 ${
                                 selectedMonth === month
                                     ? 'bg-blue-500 text-white shadow-md'
@@ -109,7 +124,6 @@ export default function ArticleGroup({ articles }: ArticleGroupProps) {
                 </div>
             )}
 
-            {/* Articles Grid */}
             {articlesForDisplay.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {articlesForDisplay.map((article) => (
