@@ -1,0 +1,37 @@
+name: Run Script on Production
+
+on:
+  workflow_dispatch: # Manual trigger
+    inputs:
+      script:
+        description: 'Path to the TSX script to run'
+        required: true
+        default: 'prisma/quickUserId.ts'
+      args:
+        description: 'Arguments to pass to the script'
+        required: false
+        default: ''
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TSX script
+        run: npx tsx ${{ github.event.inputs.script }} ${{ github.event.inputs.args }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}

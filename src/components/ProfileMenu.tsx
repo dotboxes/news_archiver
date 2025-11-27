@@ -8,6 +8,7 @@ import { isAdmin } from '@/lib/admins'; // ✅ Add this import
 
 interface ProfileMenuProps {
     user: {
+        id?: string | null;
         name?: string | null;
         email?: string | null;
         image?: string | null;
@@ -40,7 +41,7 @@ export default function ProfileMenu({ user }: ProfileMenuProps) {
     };
 
     // ✅ Check admin privileges safely
-    const userIsAdmin = user?.email ? isAdmin(user) : false;
+    const userIsAdmin = user?.id ? isAdmin({ id: user.id }) : false;
 
     return (
         <div className="relative" ref={menuRef}>
