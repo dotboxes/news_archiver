@@ -1,30 +1,27 @@
-// app/layout.tsx
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Metadata } from 'next';
-import Navbar from "@/components/Navbar";
+import Navbar from '@/components/Navbar';
 import { Providers } from './providers';
+import { DarkModeProvider } from '@/context/DarkModeContext';
+import { ThemedScript } from '@/context/ThemedScript'; // <-- IMPORT THE NEW SCRIPT COMPONENT
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = {
-    title: 'Article Hub',
-    description: 'Discover the latest articles and insights',
-};
-
-export default function RootLayout({
-                                       children,
-                                   }: {
-    children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="en">
-        <body className={inter.className}>
-        <Providers>
-            <Navbar />
-            {children}
-        </Providers>
+        <html lang="en" suppressHydrationWarning>
+        <head>
+            <ThemedScript />
+        </head>
+        <body className={`${inter.className} bg-primary transition-colors duration-300`}>
+        {/* 2. Move the DarkModeProvider back inside the body */}
+        <DarkModeProvider>
+            <Providers>
+                <Navbar />
+                {children}
+            </Providers>
+        </DarkModeProvider>
         </body>
         </html>
-    )
+    );
 }

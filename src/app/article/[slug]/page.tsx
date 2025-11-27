@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { articles as ArticleType } from '@prisma/client';
+import { parseAuthorField } from '@/lib/parseAuthor';
 import Link from 'next/link';
 
 interface ProcessedContent {
@@ -10,65 +11,94 @@ interface ProcessedContent {
     sources: Array<{ url: string; title: string }>;
 }
 
+export interface Author {
+    name: string;
+    discord_id?: string; // optional, since some old authors may not have it
+    image?: string | null;
+}
+
+
+export interface ArticleWithAuthor extends ArticleType {
+    parsedAuthor?: Author;
+    userImage?: string | null;
+}
+
+
 function processArticleContent(rawContent: string): ProcessedContent {
-    // Extract all URLs
+    console.log('Raw content length:', rawContent.length);
+    console.log('Raw content:', rawContent);
+
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const sources: Array<{ url: string; title: string }> = [];
     const urlMatches = rawContent.match(urlRegex) || [];
 
     urlMatches.forEach((url) => {
         const cleanUrl = url.replace(/[.,;:!?'")\]]+$/, '');
-        if (!sources.some(s => s.url === cleanUrl)) {
-            try {
-                const urlObj = new URL(cleanUrl);
-                const title = urlObj.hostname.replace('www.', '');
-                sources.push({ url: cleanUrl, title });
-            } catch {
-                sources.push({ url: cleanUrl, title: cleanUrl });
-            }
+
+        // Skip obviously invalid URLs
+        if (cleanUrl.length <= 8) return; // "https://" is 8 chars
+        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) return;
+
+        try {
+            const urlObj = new URL(cleanUrl);
+
+            // Must have a hostname (urlObj.hostname === "")
+            if (!urlObj.hostname) return;
+
+            const title = urlObj.hostname.replace('www.', '');
+            sources.push({ url: cleanUrl, title });
+        } catch {
+            // Still skip invalid URLs
+            return;
         }
     });
 
-    // Remove URLs from content
+
     let cleanContent = rawContent.replace(urlRegex, '').trim();
 
     // Remove markdown formatting
-    cleanContent = cleanContent.replace(/\*\*\*(.+?)\*\*\*/g, '$1'); // ***text*** -> text
-    cleanContent = cleanContent.replace(/\*\*(.+?)\*\*/g, '$1');     // **text** -> text
-    cleanContent = cleanContent.replace(/\*(.+?)\*/g, '$1');         // *text* -> text
-    cleanContent = cleanContent.replace(/~~(.+?)~~/g, '$1');         // ~~text~~ -> text
+    cleanContent = cleanContent.replace(/\*\*\*(.+?)\*\*\*/g, '$1');
+    cleanContent = cleanContent.replace(/\*\*(.+?)\*\*/g, '$1');
+    cleanContent = cleanContent.replace(/\*(.+?)\*/g, '$1');
+    cleanContent = cleanContent.replace(/~~(.+?)~~/g, '$1');
 
-    // Clean up extra whitespace
     cleanContent = cleanContent.replace(/\n\s*\n/g, '\n\n');
 
-    return {
-        content: cleanContent,
-        sources
-    };
+    console.log('Clean content length:', cleanContent.length);
+    console.log('Clean content:', cleanContent);
+
+    return { content: cleanContent, sources };
 }
+
+
 
 export default function ArticlePage() {
     const params = useParams();
     const router = useRouter();
     const slug = params.slug as string;
 
-    const [article, setArticle] = useState<ArticleType | null>(null);
+    const [article, setArticle] = useState<ArticleWithAuthor | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [processedContent, setProcessedContent] = useState<ProcessedContent | null>(null);
+    const [imgLoaded, setImgLoaded] = useState(false);
 
     useEffect(() => {
         const fetchArticle = async () => {
             try {
                 setLoading(true);
                 const response = await fetch(`/api/article/${slug}`);
-
-                if (!response.ok) {
-                    throw new Error('Article not found');
-                }
+                if (!response.ok) throw new Error('Article not found');
 
                 const data = await response.json();
-                setArticle(data.article);
+                console.log('API response:', data);
+
+                const articleData: ArticleWithAuthor = {
+                    ...data.article,
+                    parsedAuthor: parseAuthorField(data.article.author, data.article.userImage)
+                };
+
+                setArticle(articleData);
                 setProcessedContent(processArticleContent(data.article.content));
                 setError(null);
             } catch (err) {
@@ -79,22 +109,20 @@ export default function ArticlePage() {
             }
         };
 
-        if (slug) {
-            fetchArticle();
-        }
+        if (slug) fetchArticle();
     }, [slug]);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <div className="min-h-screen bg-[rgb(var(--bg-primary))] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(var(--primary))]"></div>
             </div>
         );
     }
 
     if (error || !article) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="min-h-screen bg-primary flex items-center justify-center">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">Article Not Found</h2>
                     <p className="text-gray-600 mb-6">{error || 'The article you are looking for does not exist.'}</p>
@@ -109,8 +137,12 @@ export default function ArticlePage() {
         );
     }
 
+    const hasSubtitle = Boolean(article?.subtitle && article.subtitle.trim().length > 0);
+    const hasContent  = Boolean(processedContent?.content && processedContent.content.trim().length > 0);
+    const hasSources  = Boolean(processedContent?.sources && processedContent.sources.length > 0);
+
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
+        <div className="min-h-screen bg-primary py-8">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Back Button */}
                 <button
@@ -124,15 +156,35 @@ export default function ArticlePage() {
                 </button>
 
                 {/* Article Header */}
-                <article className="bg-white rounded-lg shadow-md overflow-hidden">
-                    {/* Featured Image */}
+                <article className="bg-secondary rounded-lg shadow-md overflow-hidden">
+                    {/* Featured Image/Video */}
                     {article.image_url && (
-                        <div className="w-full h-96 relative">
-                            <img
-                                src={article.image_url}
-                                alt={article.title}
-                                className="w-full h-full object-cover"
-                            />
+                        <div className="w-full h-96 relative bg-gray-200 flex items-center justify-center">
+                            {article.media_type === 'video' &&
+                            (article.image_url.toLowerCase().indexOf('youtube.com/embed') !== -1 ||
+                                article.image_url.toLowerCase().indexOf('youtu.be') !== -1) ? (
+                                <iframe
+                                    src={article.image_url}
+                                    title="YouTube video player"
+                                    className="w-full h-full"
+                                    frameBorder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowFullScreen
+                                />
+                            ) : article.media_type === 'video' ? (
+                                <video
+                                    src={article.image_url}
+                                    controls
+                                    preload="metadata"
+                                    className="w-full h-full object-contain"
+                                />
+                            ) : (
+                                <img
+                                    src={article.image_url}
+                                    alt={article.title}
+                                    className="w-full h-full object-cover"
+                                />
+                            )}
                         </div>
                     )}
 
@@ -140,31 +192,41 @@ export default function ArticlePage() {
                     <div className="p-8">
                         {/* Category Badge */}
                         {article.category && (
-                            <span className="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
+                            <span className="inline-block bg-blue-200 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
                                 {article.category}
                             </span>
                         )}
 
                         {/* Title */}
-                        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                            {article.title}
-                        </h1>
+                        <h1 className="text-4xl font-bold text-primary mb-4">{article.title}</h1>
 
                         {/* Subtitle */}
                         {article.subtitle && (
-                            <p className="text-xl text-gray-600 mb-6">
-                                {article.subtitle}
-                            </p>
+                            <p className="text-xl text-secondary mb-6">{article.subtitle}</p>
                         )}
 
                         {/* Meta Information */}
-                        <div className="flex items-center gap-4 text-sm text-gray-500 mb-8 pb-8 border-b border-gray-200">
-                            {article.author && (
+                        <div className={`flex items-center gap-4 text-sm text-secondary mb-8 pb-8 ${ (hasSubtitle || hasContent) ? 'border-b-2 border-gray-300' : '' }`}>
+                            {article.parsedAuthor && (
                                 <div className="flex items-center gap-2">
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                    <span>{article.author}</span>
+                                    {article.parsedAuthor.image ? (
+                                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200">
+                                            {!imgLoaded && (
+                                                <div className="absolute inset-0 animate-pulse bg-gray-300"></div>
+                                            )}
+                                            <img
+                                                src={article.parsedAuthor.image}
+                                                alt={article.parsedAuthor.name}
+                                                className={`w-8 h-8 rounded-full object-cover ${imgLoaded ? 'block' : 'hidden'}`}
+                                                onLoad={() => setImgLoaded(true)}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    )}
+                                    <span className="font-medium">{article.parsedAuthor.name}</span>
                                 </div>
                             )}
                             {article.published_date && (
@@ -181,21 +243,19 @@ export default function ArticlePage() {
                             )}
                         </div>
 
-                        {/* Article Content */}
+                        {/* Main Content */}
                         <div className="prose prose-lg max-w-none mb-12">
-                            <div className="text-gray-700 leading-relaxed">
+                            <div className="text-teritary leading-relaxed">
                                 {processedContent?.content.split('\n\n').map((paragraph, idx) => (
-                                    <p key={idx} className="mb-4">
-                                        {paragraph}
-                                    </p>
+                                    <p key={idx} className="mb-4">{paragraph}</p>
                                 ))}
                             </div>
                         </div>
 
                         {/* Sources Section */}
                         {processedContent && processedContent.sources.length > 0 && (
-                            <section className="border-t-2 border-gray-300 pt-8">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Sources</h2>
+                            <section className={`pt-8 ${ hasContent ? 'border-t-2 border-gray-300' : '' }`}>
+                                <h2 className="text-2xl font-bold text-primary mb-6">Sources</h2>
                                 <ul className="space-y-3">
                                     {processedContent.sources.map((source, idx) => (
                                         <li key={idx}>

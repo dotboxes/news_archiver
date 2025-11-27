@@ -9,11 +9,12 @@ datasource db {
 
 model articles {
   id             Int       @id @default(autoincrement())
-  title          String    @db.VarChar(255)
-  subtitle       String?
+  title          String    @db.Text
+  subtitle       String?   @db.Text
   slug           String    @unique @db.VarChar(255)
-  content        String
-  image_url      String?
+  content        String    @db.Text
+  image_url      String?   @db.Text
+  media_type     String?   @default("image") @db.VarChar(10)
   author         String?   @db.VarChar(100)
   category       String?   @db.VarChar(50)
   published_date DateTime? @default(now()) @db.Timestamp(6)

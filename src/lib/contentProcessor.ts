@@ -2,6 +2,7 @@
 export interface ProcessedContent {
     content: string;
     sources: Array<{ url: string; title: string }>;
+    hasValidContent: boolean;
 }
 
 export function processArticleContent(rawContent: string): ProcessedContent {
@@ -36,8 +37,12 @@ export function processArticleContent(rawContent: string): ProcessedContent {
     // Clean up extra whitespace
     cleanContent = cleanContent.replace(/\n\s*\n/g, '\n\n');
 
+    // Check if content is valid (has actual text)
+    const hasValidContent = cleanContent.length > 0;
+
     return {
         content: cleanContent,
-        sources
+        sources,
+        hasValidContent
     };
 }
