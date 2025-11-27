@@ -30,14 +30,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 }`}
             >
                 <div
-                    className={`bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transition-transform duration-300 ${
+                    className={`bg-primary rounded-lg shadow-xl max-w-md w-full mx-4 transition-transform duration-300 ${
                         isOpen ? 'scale-100' : 'scale-95'
                     }`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
                     <div className="flex justify-between items-center p-6 border-b border-gray-200">
-                        <h2 className="text-2xl font-bold text-gray-900">Sign In</h2>
+                        <h2 className="text-2xl font-bold text-primary">Sign In</h2>
                         <button
                             onClick={onClose}
                             className="text-gray-500 hover:text-gray-700 text-2xl leading-none transition-colors"
@@ -62,7 +62,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         </form>
 
                         {/* Info Text */}
-                        <p className="text-center text-sm text-gray-600">
+                        <p className="text-center text-sm text-tertiary">
                             Sign in or create an account with Discord to get started.
                         </p>
                     </div>
