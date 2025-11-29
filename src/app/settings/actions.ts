@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/app/api/auth/config';
 import { parseAuthorField } from '@/lib/parseAuthor';
+import { isAdmin } from "@/lib/admins";
 import { Article } from "@/lib/database";
 
 // Delete a single article owned by the current user
@@ -32,8 +33,9 @@ export async function deleteArticle(articleId: number) {
         article.author === currentUser.id ||     // Use currentUser
         article.author === currentUser.name;     // Use currentUser
 
-    if (!isOwner) throw new Error('Unauthorized');
-
+    if (!isOwner && !isAdmin(currentUser)) {
+        throw new Error("Unauthorized");
+    }
     try {
         await prisma.articles.delete({ where: { id: articleId } });
     } catch (error: unknown) {
@@ -70,6 +72,7 @@ export async function bulkDeleteArticles(articleIds: number[]) {
     // Determine which articles are owned by the current user
     const ownedIds = candidates
         .filter(art => {
+            if (isAdmin(currentUser)) return true;
             const parsed = parseAuthorField(art.author ?? '');
             return (
                 parsed?.discord_id === currentUser.id || // Use currentUser
@@ -114,7 +117,9 @@ async function updateArticle(id: number, data: Partial<Article>) {
         article.author === currentUser.id ||     // Use currentUser
         article.author === currentUser.name;     // Use currentUser
 
-    if (!isOwner) throw new Error('Unauthorized');
+    if (!isOwner && !isAdmin(currentUser)) {
+        throw new Error("Unauthorized");
+    }
 
     // Update
     const updated = await prisma.articles.update({
