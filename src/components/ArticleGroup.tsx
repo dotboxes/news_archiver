@@ -236,7 +236,7 @@ export default function ArticleGroup({
                             {sortedUsersByCount.length > 5 && (
                                 <button
                                     onClick={() => document.getElementById('memberListModalButton')?.click()}
-                                    className="px-4 py-2 rounded-lg bg-secondary hover:bg-gray-400 hover:bg-gray-400 font-semibold transition-all whitespace-nowrap"
+                                    className="px-4 py-2 rounded-lg bg-secondary hover:bg-gray-400 font-semibold transition-all whitespace-nowrap"
                                 >
                                     +{sortedUsersByCount.length - 5} more
                                 </button>
@@ -262,7 +262,7 @@ export default function ArticleGroup({
                             <button
                                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                                 disabled={currentPage === 1}
-                                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-50"
+                                className="px-4 py-2 rounded-lg border border-gray-300 text-primary font-medium hover:bg-gray-400 disabled:opacity-50"
                             >
                                 Previous
                             </button>
@@ -275,7 +275,7 @@ export default function ArticleGroup({
                                         className={`px-3 py-2 rounded-lg font-medium transition-all ${
                                             currentPage === page
                                                 ? 'bg-blue-600 text-white shadow-md'
-                                                : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
+                                                : 'border border-gray-300 text-primary hover:bg-gray-400'
                                         }`}
                                     >
                                         {page}
@@ -286,7 +286,7 @@ export default function ArticleGroup({
                             <button
                                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                                 disabled={currentPage === totalPages}
-                                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-50"
+                                className="px-4 py-2 rounded-lg border border-gray-300 text-primary font-medium hover:bg-gray-400 disabled:opacity-50"
                             >
                                 Next
                             </button>
@@ -294,7 +294,7 @@ export default function ArticleGroup({
                     )}
                 </>
             ) : (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-primary">
                     {isGroupingByDate
                         ? `No articles found for ${selectedMonth} ${selectedYear}`
                         : `No articles found for ${selectedUser}`}
