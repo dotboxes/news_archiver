@@ -9,7 +9,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
 
     try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/article/${slug}`, {
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+
+        const response = await fetch(`${baseUrl}/api/article/${slug}`, {
             cache: 'no-store'
         });
 
@@ -25,7 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             title: `${data.article.title} - Potato Archive`,
             description: data.article.subtitle || data.article.content?.substring(0, 160),
         };
-    } catch {
+    } catch (error) {
+        console.error('Error fetching article metadata:', error);
         return {
             title: 'Article Not Found - Potato Archive',
         };
