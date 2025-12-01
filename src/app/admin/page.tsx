@@ -22,6 +22,10 @@ interface ArticleSummary {
     preview_text?: string | null;
 }
 
+export const metadata = {
+    title: 'Admin Dashboard',
+}
+
 // Loading skeleton
 function DashboardLoading() {
     return (
