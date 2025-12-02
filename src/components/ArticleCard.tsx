@@ -62,12 +62,60 @@ export default function ArticleCard({ article }: ArticleCardProps) {
     useEffect(() => {
         if (isVideo && article.image_url) {
             // YouTube handling
-            const match = article.image_url.match(/(?:youtube\.com\/embed\/|youtu\.be\/)([^\?&\/]+)/);
-            if (match && match[1]) {
-                setThumbnail(`https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`);
-            } else {
-                // fallback thumbnail or direct image
-                setThumbnail(article.thumbnail_url || article.image_url);
+            const youtubeMatch = article.image_url.match(/(?:youtube\.com\/embed\/|youtu\.be\/)([^\?&\/]+)/);
+            if (youtubeMatch && youtubeMatch[1]) {
+                setThumbnail(`https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg`);
+            }
+            // HTML5 video thumbnail generation
+            else {
+                const video = document.createElement('video');
+                video.crossOrigin = 'anonymous';
+                video.src = article.image_url;
+                video.muted = true; // Muted to allow autoplay in some browsers
+
+                const handleLoadedData = () => {
+                    // Seek to 1 second (or 10% of duration for shorter videos)
+                    video.currentTime = Math.min(3, video.duration * 0.1);
+                };
+
+                const handleSeeked = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        setThumbnail(thumbnailUrl);
+                    }
+
+                    // Clean up
+                    cleanup();
+                };
+
+                const handleError = () => {
+                    // Fallback to thumbnail_url or image_url on error, or null if neither exists
+                    setThumbnail(article.thumbnail_url || article.image_url || null);
+                    cleanup();
+                };
+
+                const cleanup = () => {
+                    video.removeEventListener('loadeddata', handleLoadedData);
+                    video.removeEventListener('seeked', handleSeeked);
+                    video.removeEventListener('error', handleError);
+                    video.remove();
+                };
+
+                video.addEventListener('loadeddata', handleLoadedData);
+                video.addEventListener('seeked', handleSeeked);
+                video.addEventListener('error', handleError);
+
+                video.load();
+
+                // Cleanup on unmount
+                return cleanup;
             }
         }
     }, [article.image_url, article.thumbnail_url, isVideo]);
