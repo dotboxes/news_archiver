@@ -2,47 +2,42 @@
 export interface ProcessedContent {
     content: string;
     sources: Array<{ url: string; title: string }>;
-    hasValidContent: boolean;
 }
 
 export function processArticleContent(rawContent: string): ProcessedContent {
-    // Extract all URLs
+    console.log('Raw content length:', rawContent.length);
+
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const sources: Array<{ url: string; title: string }> = [];
     const urlMatches = rawContent.match(urlRegex) || [];
 
     urlMatches.forEach((url) => {
-        // Remove trailing punctuation
         const cleanUrl = url.replace(/[.,;:!?'")\]]+$/, '');
 
-        // Avoid duplicates
-        if (!sources.some(s => s.url === cleanUrl)) {
-            // Try to extract a title from the URL
-            try {
-                const urlObj = new URL(cleanUrl);
-                const title = urlObj.hostname.replace('www.', '');
+        // Skip obviously invalid URLs
+        if (cleanUrl.length <= 8) return;
+        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) return;
+
+        try {
+            const urlObj = new URL(cleanUrl);
+            if (!urlObj.hostname) return;
+
+            const title = urlObj.hostname.replace('www.', '');
+            if (!sources.some(s => s.url === cleanUrl)) {
                 sources.push({ url: cleanUrl, title });
-            } catch {
-                sources.push({ url: cleanUrl, title: cleanUrl });
             }
+        } catch {
+            return;
         }
     });
 
-    // Remove bold markdown (**text** -> text)
-    let cleanContent = rawContent.replace(/\*\*([^\*]+)\*\*/g, '$1');
+    // Remove URLs from content but KEEP all markdown syntax
+    let cleanContent = rawContent.replace(urlRegex, '').trim();
 
-    // Remove URLs from content
-    cleanContent = cleanContent.replace(urlRegex, '').trim();
+    // Clean up excessive whitespace but preserve markdown structure
+    cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n');
 
-    // Clean up extra whitespace
-    cleanContent = cleanContent.replace(/\n\s*\n/g, '\n\n');
+    console.log('Clean content length:', cleanContent.length);
 
-    // Check if content is valid (has actual text)
-    const hasValidContent = cleanContent.length > 0;
-
-    return {
-        content: cleanContent,
-        sources,
-        hasValidContent
-    };
+    return { content: cleanContent, sources };
 }

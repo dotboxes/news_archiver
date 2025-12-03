@@ -4,73 +4,20 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { articles as ArticleType } from '@prisma/client';
 import { parseAuthorField } from '@/lib/parseAuthor';
+import { processArticleContent, ProcessedContent } from '@/lib/contentProcessor';
+import MarkdownContent from '@/components/MarkdownContent';
 import Link from 'next/link';
-
-interface ProcessedContent {
-    content: string;
-    sources: Array<{ url: string; title: string }>;
-}
 
 export interface Author {
     name: string;
-    discord_id?: string; // optional, since some old authors may not have it
+    discord_id?: string;
     image?: string | null;
 }
-
 
 export interface ArticleWithAuthor extends ArticleType {
     parsedAuthor?: Author;
     userImage?: string | null;
 }
-
-
-function processArticleContent(rawContent: string): ProcessedContent {
-    console.log('Raw content length:', rawContent.length);
-    console.log('Raw content:', rawContent);
-
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const sources: Array<{ url: string; title: string }> = [];
-    const urlMatches = rawContent.match(urlRegex) || [];
-
-    urlMatches.forEach((url) => {
-        const cleanUrl = url.replace(/[.,;:!?'")\]]+$/, '');
-
-        // Skip obviously invalid URLs
-        if (cleanUrl.length <= 8) return; // "https://" is 8 chars
-        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) return;
-
-        try {
-            const urlObj = new URL(cleanUrl);
-
-            // Must have a hostname (urlObj.hostname === "")
-            if (!urlObj.hostname) return;
-
-            const title = urlObj.hostname.replace('www.', '');
-            sources.push({ url: cleanUrl, title });
-        } catch {
-            // Still skip invalid URLs
-            return;
-        }
-    });
-
-
-    let cleanContent = rawContent.replace(urlRegex, '').trim();
-
-    // Remove markdown formatting
-    cleanContent = cleanContent.replace(/\*\*\*(.+?)\*\*\*/g, '$1');
-    cleanContent = cleanContent.replace(/\*\*(.+?)\*\*/g, '$1');
-    cleanContent = cleanContent.replace(/\*(.+?)\*/g, '$1');
-    cleanContent = cleanContent.replace(/~~(.+?)~~/g, '$1');
-
-    cleanContent = cleanContent.replace(/\n\s*\n/g, '\n\n');
-
-    console.log('Clean content length:', cleanContent.length);
-    console.log('Clean content:', cleanContent);
-
-    return { content: cleanContent, sources };
-}
-
-
 
 export default function ArticlePage() {
     const params = useParams();
@@ -128,7 +75,7 @@ export default function ArticlePage() {
                     <p className="text-gray-600 mb-6">{error || 'The article you are looking for does not exist.'}</p>
                     <button
                         onClick={() => router.push('/')}
-                        className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+                        className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-600"
                     >
                         Back to Home
                     </button>
@@ -138,8 +85,7 @@ export default function ArticlePage() {
     }
 
     const hasSubtitle = Boolean(article?.subtitle && article.subtitle.trim().length > 0);
-    const hasContent  = Boolean(processedContent?.content && processedContent.content.trim().length > 0);
-    const hasSources  = Boolean(processedContent?.sources && processedContent.sources.length > 0);
+    const hasContent = Boolean(processedContent?.content && processedContent.content.trim().length > 0);
 
     return (
         <div className="min-h-screen bg-primary py-8">
@@ -206,7 +152,7 @@ export default function ArticlePage() {
                         )}
 
                         {/* Meta Information */}
-                        <div className={`flex items-center gap-4 text-sm text-secondary mb-8 pb-8 ${ (hasSubtitle || hasContent) ? 'border-b-2 border-gray-300' : '' }`}>
+                        <div className={`flex items-center gap-4 text-sm text-secondary mb-8 pb-8 ${(hasSubtitle || hasContent) ? 'border-b-2 border-gray-300' : ''}`}>
                             {article.parsedAuthor && (
                                 <div className="flex items-center gap-2">
                                     {article.parsedAuthor.image ? (
@@ -243,18 +189,16 @@ export default function ArticlePage() {
                             )}
                         </div>
 
-                        {/* Main Content */}
-                        <div className="prose prose-lg max-w-none mb-12">
-                            <div className="text-teritary leading-relaxed">
-                                {processedContent?.content.split('\n\n').map((paragraph, idx) => (
-                                    <p key={idx} className="mb-4">{paragraph}</p>
-                                ))}
+                        {/* Main Content - NOW WITH MARKDOWN */}
+                        {processedContent && hasContent && (
+                            <div className="mb-12">
+                                <MarkdownContent content={processedContent.content} />
                             </div>
-                        </div>
+                        )}
 
                         {/* Sources Section */}
                         {processedContent && processedContent.sources.length > 0 && (
-                            <section className={`pt-8 ${ hasContent ? 'border-t-2 border-gray-300' : '' }`}>
+                            <section className={`pt-8 ${hasContent ? 'border-t-2 border-gray-300' : ''}`}>
                                 <h2 className="text-2xl font-bold text-primary mb-6">Sources</h2>
                                 <ul className="space-y-3">
                                     {processedContent.sources.map((source, idx) => (
