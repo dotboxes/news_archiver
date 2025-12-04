@@ -64,6 +64,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         {/* Info Text */}
                         <p className="text-center text-sm text-tertiary">
                             Sign in or create an account with Discord to get started.
+                            <br />The only information stored is your e-mail address.
                         </p>
                     </div>
                 </div>
