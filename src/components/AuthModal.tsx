@@ -68,6 +68,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         </p>
                     </div>
                 </div>
+
             </div>
         </>
     );
