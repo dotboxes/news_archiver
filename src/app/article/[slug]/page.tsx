@@ -107,8 +107,8 @@ export default function ArticlePage() {
                     {article.image_url && (
                         <div className="w-full h-96 relative bg-gray-200 flex items-center justify-center">
                             {article.media_type === 'video' &&
-                            (article.image_url.toLowerCase().indexOf('youtube.com/embed') !== -1 ||
-                                article.image_url.toLowerCase().indexOf('youtu.be') !== -1) ? (
+                            (article.image_url.toLowerCase().includes('youtube.com/embed') ||
+                                article.image_url.toLowerCase().includes('youtu.be')) ? (
                                 <iframe
                                     src={article.image_url}
                                     title="YouTube video player"
@@ -133,6 +133,7 @@ export default function ArticlePage() {
                             )}
                         </div>
                     )}
+
 
                     {/* Article Content */}
                     <div className="p-8">

@@ -21,16 +21,28 @@ export default function ArticleCard({ article }: ArticleCardProps) {
     const [imgLoaded, setImgLoaded] = useState(false);
     const [author, setAuthor] = useState<Author | null>(null);
     const [thumbnail, setThumbnail] = useState<string | null>(null);
+    const [mediaError, setMediaError] = useState(false);
 
     const isVideo = article.media_type === 'video';
+    const hasMedia = article.image_url || thumbnail;
 
-    // Automatically mark text as loaded once media has loaded
+    // Check if it's a Twitter video
+    const isTwitterVideo = article.image_url?.includes('twimg.com') || article.image_url?.includes('twitter.com');
+
+    // Automatically mark text as loaded once media has loaded OR if there's no media
     useEffect(() => {
-        if (mediaLoaded && !textLoaded) {
+        if ((mediaLoaded || !hasMedia || mediaError) && !textLoaded) {
             const timeout = setTimeout(() => setTextLoaded(true), 100);
             return () => clearTimeout(timeout);
         }
-    }, [mediaLoaded, textLoaded]);
+    }, [mediaLoaded, textLoaded, hasMedia, mediaError]);
+
+    // Mark media as loaded immediately if there's no media to load
+    useEffect(() => {
+        if (!hasMedia) {
+            setMediaLoaded(true);
+        }
+    }, [hasMedia]);
 
     // Fetch author info with caching
     useEffect(() => {
@@ -61,64 +73,67 @@ export default function ArticleCard({ article }: ArticleCardProps) {
     // Generate thumbnail for videos
     useEffect(() => {
         if (isVideo && article.image_url) {
+            // Twitter videos - use the video URL as thumbnail (will be handled differently in render)
+            if (isTwitterVideo) {
+                setThumbnail(article.thumbnail_url || null);
+                setMediaLoaded(true); // Mark as loaded since we won't generate a thumbnail
+                return;
+            }
+
             // YouTube handling
             const youtubeMatch = article.image_url.match(/(?:youtube\.com\/embed\/|youtu\.be\/)([^\?&\/]+)/);
             if (youtubeMatch && youtubeMatch[1]) {
                 setThumbnail(`https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg`);
+                return;
             }
+
             // HTML5 video thumbnail generation
-            else {
-                const video = document.createElement('video');
-                video.crossOrigin = 'anonymous';
-                video.src = article.image_url;
-                video.muted = true; // Muted to allow autoplay in some browsers
+            const video = document.createElement('video');
+            video.crossOrigin = 'anonymous';
+            video.src = article.image_url;
+            video.muted = true;
 
-                const handleLoadedData = () => {
-                    // Seek to 1 second (or 10% of duration for shorter videos)
-                    video.currentTime = Math.min(3, video.duration * 0.1);
-                };
+            const handleLoadedData = () => {
+                video.currentTime = Math.min(3, video.duration * 0.1);
+            };
 
-                const handleSeeked = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+            const handleSeeked = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
 
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    setThumbnail(thumbnailUrl);
+                }
 
-                        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
-                        setThumbnail(thumbnailUrl);
-                    }
+                cleanup();
+            };
 
-                    // Clean up
-                    cleanup();
-                };
+            const handleError = () => {
+                setThumbnail(article.thumbnail_url || null);
+                setMediaError(true);
+                cleanup();
+            };
 
-                const handleError = () => {
-                    // Fallback to thumbnail_url or image_url on error, or null if neither exists
-                    setThumbnail(article.thumbnail_url || article.image_url || null);
-                    cleanup();
-                };
+            const cleanup = () => {
+                video.removeEventListener('loadeddata', handleLoadedData);
+                video.removeEventListener('seeked', handleSeeked);
+                video.removeEventListener('error', handleError);
+                video.remove();
+            };
 
-                const cleanup = () => {
-                    video.removeEventListener('loadeddata', handleLoadedData);
-                    video.removeEventListener('seeked', handleSeeked);
-                    video.removeEventListener('error', handleError);
-                    video.remove();
-                };
+            video.addEventListener('loadeddata', handleLoadedData);
+            video.addEventListener('seeked', handleSeeked);
+            video.addEventListener('error', handleError);
 
-                video.addEventListener('loadeddata', handleLoadedData);
-                video.addEventListener('seeked', handleSeeked);
-                video.addEventListener('error', handleError);
+            video.load();
 
-                video.load();
-
-                // Cleanup on unmount
-                return cleanup;
-            }
+            return cleanup;
         }
-    }, [article.image_url, article.thumbnail_url, isVideo]);
+    }, [article.image_url, article.thumbnail_url, isVideo, isTwitterVideo]);
 
     const displayImage = isVideo ? thumbnail : article.image_url;
 
@@ -126,19 +141,35 @@ export default function ArticleCard({ article }: ArticleCardProps) {
         <Link href={`/article/${article.slug}`}>
             <div className="bg-secondary rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer h-full flex flex-col">
                 {/* Media */}
-                <div className="w-full h-48 relative overflow-hidden bg-tertiary">
-                    {!mediaLoaded && (
-                        <div className="absolute inset-0 animate-pulse bg-tertiary"></div>
-                    )}
-                    {displayImage && (
-                        <img
-                            src={displayImage}
-                            alt={article.title}
-                            className={`w-full h-full object-cover transition-transform duration-300 hover:scale-105 ${mediaLoaded ? 'block' : 'hidden'}`}
-                            onLoad={() => setMediaLoaded(true)}
-                        />
-                    )}
-                </div>
+                {hasMedia && (
+                    <div className="w-full h-48 relative overflow-hidden bg-tertiary">
+                        {!mediaLoaded && !mediaError && (
+                            <div className="absolute inset-0 animate-pulse bg-tertiary"></div>
+                        )}
+
+                        {/* Twitter videos - render as video element for preview/playback */}
+                        {isVideo && isTwitterVideo && article.image_url ? (
+                            <video
+                                src={article.image_url}
+                                className={`w-full h-full object-cover ${mediaLoaded ? 'block' : 'hidden'}`}
+                                controls
+                                preload="metadata"
+                                onLoadedMetadata={() => setMediaLoaded(true)}
+                                onError={() => setMediaError(true)}
+                            >
+                                Your browser does not support the video tag.
+                            </video>
+                        ) : displayImage ? (
+                            <img
+                                src={displayImage}
+                                alt={article.title}
+                                className={`w-full h-full object-cover transition-transform duration-300 hover:scale-105 ${mediaLoaded ? 'block' : 'hidden'}`}
+                                onLoad={() => setMediaLoaded(true)}
+                                onError={() => setMediaError(true)}
+                            />
+                        ) : null}
+                    </div>
+                )}
 
                 {/* Content */}
                 <div className="p-6 flex-1 flex flex-col">
