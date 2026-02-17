@@ -89,9 +89,14 @@ export default function ArticleGroup({
                                          selectedYear: propYear,
                                          selectedMonth: propMonth,
                                          onSelect,
-                                         sortBy = 'date',
+                                         sortBy: propSortBy = 'date',
                                          onSortChange
                                      }: ArticleGroupProps) {
+    const [sortBy, setSortBy] = useState<'date' | 'user'>(() => {
+        const cached = sessionStorage.getItem('articleGroup_sortBy') as 'date' | 'user' | null;
+        return cached ?? propSortBy;
+    });
+
     const groupedByDate = useMemo(() => groupByYearMonth(articles), [articles]);
     const groupedByUser = useMemo(() => groupByUser(articles), [articles]);
 
@@ -123,15 +128,20 @@ export default function ArticleGroup({
     const [selectedMonth, setSelectedMonth] = useState<string>(propMonth || latestMonth || '');
     const [selectedUser, setSelectedUser] = useState<string>(firstUser || '');
     const [currentPage, setCurrentPage] = useState<number>(() => {
-        const cached = sessionStorage.getItem('articleGroup_currentPage');
+        const cached = sessionStorage.getItem(`articleGroup_currentPage_${sortBy}`);
         return cached ? parseInt(cached, 10) : 1;
     });
 
     const ITEMS_PER_PAGE = 9;
 
     useEffect(() => {
-        sessionStorage.setItem('articleGroup_currentPage', String(currentPage));
-    }, [currentPage]);
+        sessionStorage.setItem(`articleGroup_currentPage_${sortBy}`, String(currentPage));
+    }, [currentPage, sortBy]);
+
+    useEffect(() => {
+        const cached = sessionStorage.getItem(`articleGroup_currentPage_${sortBy}`);
+        setCurrentPage(cached ? parseInt(cached, 10) : 1);
+    }, [sortBy]);
 
     useEffect(() => {
         if (isGroupingByDate) {
@@ -181,6 +191,8 @@ export default function ArticleGroup({
     };
 
     const handleSortChange = (newSort: 'date' | 'user') => {
+        sessionStorage.setItem('articleGroup_sortBy', newSort);
+        setSortBy(newSort);
         onSortChange?.(newSort);
         setCurrentPage(1);
     };
