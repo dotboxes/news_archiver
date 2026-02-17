@@ -34,7 +34,6 @@ function groupByUser(articles: ArticlePreview[]) {
 
         if (article.author) {
             try {
-                // Try to parse JSON (if it’s stored as a JSON string)
                 const parsed = JSON.parse(article.author);
                 if (parsed && typeof parsed === 'object' && 'name' in parsed) {
                     authorName = parsed.name;
@@ -42,7 +41,6 @@ function groupByUser(articles: ArticlePreview[]) {
                     authorName = String(article.author);
                 }
             } catch {
-                // Not JSON — treat it as a plain string
                 authorName = String(article.author);
             }
         }
@@ -51,6 +49,38 @@ function groupByUser(articles: ArticlePreview[]) {
         grouped[authorName].push(article);
     });
     return grouped;
+}
+
+function getPaginationRange(currentPage: number, totalPages: number): (number | '...')[] {
+    const delta = 2;
+    const range: number[] = [];
+    const rangeWithDots: (number | '...')[] = [];
+
+    for (
+        let i = Math.max(2, currentPage - delta);
+        i <= Math.min(totalPages - 1, currentPage + delta);
+        i++
+    ) {
+        range.push(i);
+    }
+
+    rangeWithDots.push(1);
+
+    if (range[0] > 2) {
+        rangeWithDots.push('...');
+    }
+
+    rangeWithDots.push(...range);
+
+    if (range[range.length - 1] < totalPages - 1) {
+        rangeWithDots.push('...');
+    }
+
+    if (totalPages > 1) {
+        rangeWithDots.push(totalPages);
+    }
+
+    return rangeWithDots;
 }
 
 
@@ -68,7 +98,6 @@ export default function ArticleGroup({
     const isGroupingByDate = sortBy === 'date';
     const sortedYears = useMemo(() => Object.keys(groupedByDate).sort((a, b) => parseInt(b) - parseInt(a)), [groupedByDate]);
 
-    // Sort users by number of posts (descending)
     const sortedUsersByCount = useMemo(() => {
         return Object.entries(groupedByUser)
             .sort((a, b) => b[1].length - a[1].length)
@@ -93,9 +122,16 @@ export default function ArticleGroup({
     const [selectedYear, setSelectedYear] = useState<string>(propYear || latestYear || '');
     const [selectedMonth, setSelectedMonth] = useState<string>(propMonth || latestMonth || '');
     const [selectedUser, setSelectedUser] = useState<string>(firstUser || '');
-    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [currentPage, setCurrentPage] = useState<number>(() => {
+        const cached = sessionStorage.getItem('articleGroup_currentPage');
+        return cached ? parseInt(cached, 10) : 1;
+    });
 
     const ITEMS_PER_PAGE = 9;
+
+    useEffect(() => {
+        sessionStorage.setItem('articleGroup_currentPage', String(currentPage));
+    }, [currentPage]);
 
     useEffect(() => {
         if (isGroupingByDate) {
@@ -243,7 +279,6 @@ export default function ArticleGroup({
                             )}
                         </div>
                     </div>
-
                 </>
             )}
 
@@ -267,20 +302,29 @@ export default function ArticleGroup({
                                 Previous
                             </button>
 
-                            <div className="flex gap-1">
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                    <button
-                                        key={page}
-                                        onClick={() => setCurrentPage(page)}
-                                        className={`px-3 py-2 rounded-lg font-medium transition-all ${
-                                            currentPage === page
-                                                ? 'bg-blue-600 text-white shadow-md'
-                                                : 'border border-gray-300 text-primary hover:bg-gray-400'
-                                        }`}
-                                    >
-                                        {page}
-                                    </button>
-                                ))}
+                            <div className="flex gap-1 items-center">
+                                {getPaginationRange(currentPage, totalPages).map((page, index) =>
+                                    page === '...' ? (
+                                        <span
+                                            key={`dots-${index}`}
+                                            className="px-2 py-2 text-primary select-none"
+                                        >
+                                            &hellip;
+                                        </span>
+                                    ) : (
+                                        <button
+                                            key={page}
+                                            onClick={() => setCurrentPage(page)}
+                                            className={`px-3 py-2 rounded-lg font-medium transition-all ${
+                                                currentPage === page
+                                                    ? 'bg-blue-600 text-white shadow-md'
+                                                    : 'border border-gray-300 text-primary hover:bg-gray-400'
+                                            }`}
+                                        >
+                                            {page}
+                                        </button>
+                                    )
+                                )}
                             </div>
 
                             <button
