@@ -3,6 +3,7 @@ export interface Author {
     name: string;
     discord_id?: string;
     image?: string | null;
+    userId?: string | null;
 }
 
 /**
@@ -14,7 +15,8 @@ export interface Author {
 // lib/parseAuthor.ts
 export function parseAuthorField(
     authorField: string | Author | undefined | null,
-    userImage?: string | null
+    userImage?: string | null,
+    userId?: string | null
 ): Author | null {
     if (!authorField) return null;
 
@@ -25,17 +27,17 @@ export function parseAuthorField(
                 name: parsed.name || authorField,
                 discord_id: parsed.discord_id,
                 image: userImage || parsed.image,
+                userId,
             };
         } catch {
-            return { name: authorField, image: userImage || undefined };
+            return { name: authorField, image: userImage || undefined, userId };
         }
     }
 
-    // It's already an object
     return {
         name: authorField.name || 'Unknown Author',
         discord_id: authorField.discord_id,
         image: userImage || authorField.image,
+        userId,
     };
 }
-

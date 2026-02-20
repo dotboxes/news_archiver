@@ -36,13 +36,14 @@ export async function GET(request: Request) {
 
         // Fetch user image if author has discord_id
         let userImage = null;
+        let userId = null;
+
         if (article.author) {
             try {
                 const authorData = JSON.parse(article.author);
                 console.log('Parsed author data:', authorData);
 
                 if (authorData.discord_id) {
-                    // Look up user by Discord provider account
                     const account = await prisma.account.findFirst({
                         where: {
                             provider: 'discord',
@@ -50,12 +51,87 @@ export async function GET(request: Request) {
                         },
                         include: {
                             user: {
-                                select: { image: true, name: true }
+                                select: { image: true, name: true, id: true }
                             }
                         }
                     });
-                    console.log('Found account:', account);
-                    userImage = account?.user?.image;
+
+                    userImage = account?.user?.image ?? null;
+                    userId = account?.user?.id ?? null;
+
+                    if (account?.access_token && account?.user?.id) {
+                        let accessToken = account.access_token;
+
+                        // Try the token, refresh if 401
+                        let discordRes = await fetch("https://discord.com/api/users/@me", {
+                            headers: { Authorization: `Bearer ${accessToken}` },
+                        });
+
+                        console.log('Discord API status:', discordRes.status);
+
+                        if (discordRes.status === 401 && account.refresh_token) {
+                            console.log('Token invalid, refreshing...');
+                            const refreshRes = await fetch("https://discord.com/api/oauth2/token", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                                body: new URLSearchParams({
+                                    client_id: process.env.DISCORD_CLIENT_ID!,
+                                    client_secret: process.env.DISCORD_CLIENT_SECRET!,
+                                    grant_type: "refresh_token",
+                                    refresh_token: account.refresh_token,
+                                }),
+                            });
+
+                            console.log('Refresh status:', refreshRes.status);
+
+                            if (refreshRes.ok) {
+                                const refreshed = await refreshRes.json();
+                                accessToken = refreshed.access_token;
+
+                                await prisma.account.update({
+                                    where: {
+                                        provider_providerAccountId: {
+                                            provider: 'discord',
+                                            providerAccountId: authorData.discord_id,
+                                        },
+                                    },
+                                    data: {
+                                        access_token: refreshed.access_token,
+                                        refresh_token: refreshed.refresh_token ?? account.refresh_token,
+                                        expires_at: Math.floor(Date.now() / 1000) + refreshed.expires_in,
+                                    },
+                                });
+
+                                // Retry with new token
+                                discordRes = await fetch("https://discord.com/api/users/@me", {
+                                    headers: { Authorization: `Bearer ${accessToken}` },
+                                });
+                                console.log('Retry status:', discordRes.status);
+                            }
+                        }
+
+                        if (discordRes.ok) {
+                            const discordUser = await discordRes.json();
+                            const freshAvatar = discordUser.avatar
+                                ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+                                : null;
+
+                            console.log('Fresh avatar:', freshAvatar);
+                            console.log('Stored avatar:', userImage);
+
+                            if (freshAvatar !== userImage) {
+                                console.log('Updating avatar in DB...');
+                                await prisma.user.update({
+                                    where: { id: account.user.id },
+                                    data: {
+                                        image: freshAvatar,
+                                        name: discordUser.global_name ?? discordUser.username,
+                                    },
+                                });
+                                userImage = freshAvatar;
+                            }
+                        }
+                    }
                 }
             } catch (e) {
                 // Not JSON - it's an old-style plain string author name
@@ -68,7 +144,8 @@ export async function GET(request: Request) {
         return NextResponse.json({
             article: {
                 ...article,
-                userImage
+                userImage,
+                userId,
             }
         });
     } catch (err: unknown) {

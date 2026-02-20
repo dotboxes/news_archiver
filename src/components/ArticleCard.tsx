@@ -56,12 +56,12 @@ export default function ArticleCard({ article }: ArticleCardProps) {
                 const response = await fetch(`/api/article/${article.slug}`);
                 if (!response.ok) throw new Error('Failed to fetch author');
                 const data = await response.json();
-                const parsedAuthor = parseAuthorField(data.article.author, data.article.userImage);
+                const parsedAuthor = parseAuthorField(data.article.author, data.article.userImage, data.article.userId); // updated
                 authorCache.set(article.slug, parsedAuthor);
                 setAuthor(parsedAuthor);
             } catch (err) {
                 console.error('Author fetch failed:', err);
-                const fallbackAuthor = parseAuthorField(article.author, null);
+                const fallbackAuthor = parseAuthorField(article.author, null, null); // updated
                 authorCache.set(article.slug, fallbackAuthor);
                 setAuthor(fallbackAuthor);
             }
@@ -220,6 +220,19 @@ export default function ArticleCard({ article }: ArticleCardProps) {
                                                 alt={author.name}
                                                 className={`w-6 h-6 rounded-full object-cover ${imgLoaded ? 'block' : 'hidden'}`}
                                                 onLoad={() => setImgLoaded(true)}
+                                                onError={async () => {
+                                                    if (!author.userId) return;
+                                                    try {
+                                                        const res = await fetch(`/api/user/refresh-avatar?userId=${author.userId}`);
+                                                        if (res.ok) {
+                                                            const data = await res.json();
+                                                            setAuthor(prev => prev ? { ...prev, image: data.image } : prev);
+                                                            authorCache.set(article.slug, { ...author, image: data.image });
+                                                        }
+                                                    } catch (e) {
+                                                        console.error("Avatar refresh failed:", e);
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     ) : (
